@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Building2, Briefcase, TrendingUp, Trophy, XCircle, CheckSquare, Activity } from 'lucide-react';
+import { Users, Building2, Briefcase, TrendingUp, Trophy, XCircle, CheckSquare, Activity, Receipt, Wallet, FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/lib/api';
 import { useRealtime } from '@/hooks/useWebSocket';
 import { formatCurrency, formatRelative } from '@/lib/format';
-import { DEAL_STAGES } from '@/lib/constants';
+import { stageTypeMeta } from '@/lib/constants';
 import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/Spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,7 +42,7 @@ export default function Dashboard() {
 
   // Live updates: refresh stats on any entity change, prepend new activities.
   useRealtime(
-    ['contact.created', 'contact.deleted', 'company.created', 'company.deleted', 'deal.created', 'deal.updated', 'deal.deleted', 'task.created', 'task.updated'],
+    ['contact.created', 'contact.deleted', 'company.created', 'company.deleted', 'deal.created', 'deal.updated', 'deal.deleted', 'task.created', 'task.updated', 'invoice.created', 'invoice.updated', 'invoice.deleted'],
     loadStats
   );
   useRealtime('activity.created', (msg) => {
@@ -51,10 +51,10 @@ export default function Dashboard() {
 
   if (loading || !stats) return <PageLoader />;
 
-  const chartData = DEAL_STAGES.map((s) => ({
-    name: s.label,
-    value: stats.dealsByStage?.[s.value]?.count || 0,
-    fill: s.value === 'won' ? '#10b981' : s.value === 'lost' ? '#f43f5e' : '#6366f1',
+  const chartData = (stats.stages || []).map((s) => ({
+    name: s.name,
+    value: s.count || 0,
+    fill: stageTypeMeta(s.type).dot,
   }));
 
   return (
@@ -80,11 +80,17 @@ export default function Dashboard() {
         />
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard icon={Receipt} label="Outstanding" value={formatCurrency(stats.invoiceOutstanding || 0)} to="/invoices" accent="bg-amber-100 text-amber-600" />
+        <StatCard icon={Wallet} label="Paid invoices" value={formatCurrency(stats.invoicePaid || 0)} to="/invoices" accent="bg-emerald-100 text-emerald-600" />
+        <StatCard icon={FileText} label="Invoices" value={stats.invoiceCount || 0} to="/invoices" accent="bg-violet-100 text-violet-600" />
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Pipeline chart */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Pipeline by stage</CardTitle>
+            <CardTitle>{stats.pipelineName ? `${stats.pipelineName} — by stage` : 'Pipeline by stage'}</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={280}>

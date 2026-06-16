@@ -35,7 +35,13 @@ router.get('/:id', (req, res) => {
   if (!company) return res.status(404).json({ error: 'Company not found' });
 
   const contacts = db.prepare('SELECT * FROM contacts WHERE company_id = ? ORDER BY created_at DESC').all(company.id);
-  const deals = db.prepare('SELECT * FROM deals WHERE company_id = ? ORDER BY created_at DESC').all(company.id);
+  const deals = db
+    .prepare(
+      `SELECT d.*, s.name AS stage_name, s.type AS stage_type
+       FROM deals d LEFT JOIN stages s ON s.id = d.stage_id
+       WHERE d.company_id = ? ORDER BY d.created_at DESC`
+    )
+    .all(company.id);
   const note_entries = db
     .prepare("SELECT * FROM notes WHERE entity_type = 'company' AND entity_id = ? ORDER BY created_at DESC")
     .all(company.id);

@@ -39,13 +39,33 @@ CREATE TABLE IF NOT EXISTS contacts (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- A pipeline ("funnel") is a named board with its own ordered set of stages.
+CREATE TABLE IF NOT EXISTS pipelines (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- A stage is a column within a pipeline. `type` drives won/lost reporting.
+CREATE TABLE IF NOT EXISTS stages (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  pipeline_id INTEGER NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  type        TEXT NOT NULL DEFAULT 'open',   -- 'open' | 'won' | 'lost'
+  position    INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS deals (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   name         TEXT NOT NULL,
   company_id   INTEGER REFERENCES companies(id) ON DELETE SET NULL,
   contact_id   INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
   value        REAL NOT NULL DEFAULT 0,
-  stage        TEXT NOT NULL DEFAULT 'lead',
+  stage        TEXT NOT NULL DEFAULT 'lead',   -- denormalized stage name (mirror)
+  stage_id     INTEGER REFERENCES stages(id) ON DELETE SET NULL,
   close_date   TEXT,
   notes        TEXT,
   created_at   TEXT NOT NULL DEFAULT (datetime('now')),
@@ -85,9 +105,39 @@ CREATE TABLE IF NOT EXISTS activities (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Invoices and their line items. Totals are computed on read, never stored.
+CREATE TABLE IF NOT EXISTS invoices (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  number     TEXT NOT NULL,
+  company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+  contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+  status     TEXT NOT NULL DEFAULT 'draft',   -- draft|sent|paid|overdue|void
+  issue_date TEXT,
+  due_date   TEXT,
+  tax_rate   REAL NOT NULL DEFAULT 0,         -- percentage, e.g. 8.5
+  notes      TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id  INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  quantity    REAL NOT NULL DEFAULT 1,
+  unit_price  REAL NOT NULL DEFAULT 0,
+  position    INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company_id);
 CREATE INDEX IF NOT EXISTS idx_deals_company    ON deals(company_id);
 CREATE INDEX IF NOT EXISTS idx_deals_contact    ON deals(contact_id);
 CREATE INDEX IF NOT EXISTS idx_deals_stage      ON deals(stage);
+CREATE INDEX IF NOT EXISTS idx_stages_pipeline  ON stages(pipeline_id);
+-- Note: idx_deals_stage_id is created in migrate() after the stage_id column
+-- is guaranteed to exist (older databases add it via ALTER TABLE).
 CREATE INDEX IF NOT EXISTS idx_notes_entity     ON notes(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_status  ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_company ON invoices(company_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);

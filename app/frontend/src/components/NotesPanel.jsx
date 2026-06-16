@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatRelative } from '@/lib/format';
+import { useRealtime } from '@/hooks/useWebSocket';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/sonner';
@@ -9,10 +10,28 @@ import { toast } from '@/components/ui/sonner';
 /**
  * Add and list notes for a given entity.
  * `notes` is the current array; `onChange` is called with the updated array.
+ *
+ * Notes update in real time: when anyone adds or removes a note on this same
+ * record, the WebSocket event keeps every connected client in sync.
  */
 export function NotesPanel({ entityType, entityId, notes = [], onChange }) {
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Only react to events for *this* record. Dedupe by id so the author who
+  // already added the note optimistically doesn't see it twice.
+  useRealtime(['note.created', 'note.deleted'], (msg) => {
+    if (msg.type === 'note.created') {
+      const note = msg.payload;
+      if (note.entity_type !== entityType || Number(note.entity_id) !== Number(entityId)) return;
+      if (notes.some((n) => n.id === note.id)) return;
+      onChange?.([note, ...notes]);
+    } else {
+      const { id } = msg.payload;
+      if (!notes.some((n) => n.id === id)) return;
+      onChange?.(notes.filter((n) => n.id !== id));
+    }
+  });
 
   async function addNote(e) {
     e.preventDefault();

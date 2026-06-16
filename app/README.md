@@ -6,18 +6,20 @@ tasks, notes, and a live activity feed — in a clean, fast single-page app.
 
 Built to be simple and readable: React + Tailwind + shadcn/ui on the front end,
 Node + Express + SQLite on the back end, and native WebSockets for real-time
-updates. Everything runs in a single Docker container with one command.
+updates. Runs with a single Docker command.
 
 ---
 
-## Quick start (Docker — recommended)
+## Quick start
+
+One command — that's it:
 
 ```bash
 cd app
-docker compose up --build
+docker compose up
 ```
 
-Then open **http://localhost:4000**.
+Then open **http://localhost:5173**.
 
 Log in with the seeded admin account:
 
@@ -29,12 +31,48 @@ Log in with the seeded admin account:
 > Tip: log in as both users in two browser windows to watch real-time updates
 > propagate instantly between sessions.
 
-The database is seeded automatically on first run and stored in a Docker volume
-(`crm-data`), so your data survives restarts. To start completely fresh:
+This default stack runs in **development mode with live reload** — your source
+is mounted into the containers, so:
+
+- editing **any frontend file** hot-reloads the browser instantly (Vite HMR);
+- editing **any backend file** restarts the API automatically (`node --watch`).
+
+The database is seeded automatically on first run. The first boot installs
+dependencies inside the containers, so it takes a little longer; subsequent
+starts are fast. To start over with a fresh database:
 
 ```bash
-docker compose down -v   # removes the volume, re-seeds on next start
+docker compose down -v   # removes volumes, re-seeds on next start
 ```
+
+---
+
+## Production build (single container)
+
+To run the optimized production build — frontend compiled to static files and
+served by the backend from a single container on port **4000**:
+
+```bash
+cd app
+docker compose -f docker-compose.prod.yml up --build
+```
+
+Then open **http://localhost:4000**.
+
+> Both stacks use backend port 4000, so run one at a time (`docker compose down`
+> before switching).
+
+### Configuration
+
+Environment variables for the dev stack live in **`app/.env`** (auto-loaded by
+Docker Compose):
+
+| Variable      | Default                | Description                                        |
+| ------------- | ---------------------- | -------------------------------------------------- |
+| `BACKEND_URL` | `http://backend:4000`  | Backend the frontend dev server proxies `/api` and `/ws` to. |
+
+Change `BACKEND_URL` to point the frontend at a different backend (e.g.
+`http://localhost:4000` for host-only dev), then restart with `docker compose up -d`.
 
 ---
 
@@ -73,8 +111,15 @@ created automatically the first time the backend starts.
   related deals and notes.
 - **Companies** — full CRUD with a detail page showing related contacts, deals,
   and notes.
-- **Deals** — a Kanban pipeline (Lead → Qualified → Proposal → Negotiation →
-  Won / Lost) with drag-and-drop between stages.
+- **Deals** — a drag-and-drop Kanban pipeline. Pipelines are fully
+  customizable: add, rename, reorder (drag), and delete columns; create multiple
+  funnels and switch between them. Each column has a type (Open / Won / Lost)
+  that drives win-rate reporting.
+- **Invoices** — create, edit, and manage invoices with multiple line items,
+  per-invoice tax rate, and auto-generated numbers (`INV-0001`). Totals are
+  computed automatically; track status (draft → sent → paid / overdue / void),
+  view a printable invoice document, and see outstanding/paid rollups on the
+  dashboard.
 - **Tasks** — create tasks optionally linked to a contact, company, or deal;
   set priority and due date; mark complete; filter by status.
 - **Notes & Activity** — add notes to any record; key actions (created, updated,
@@ -128,9 +173,11 @@ served by the same Express server that exposes the API and WebSocket, so the
 whole app runs on one port (`4000`) in one container.
 
 **Database.** SQLite with a straightforward schema (`users`, `companies`,
-`contacts`, `deals`, `tasks`, `notes`, `activities`). The schema lives in
-`backend/src/db/schema.sql` and is applied on startup (`CREATE TABLE IF NOT
-EXISTS`). Seed data is inserted on first run only. To re-seed an existing local
+`contacts`, `deals`, `tasks`, `notes`, `activities`, `pipelines` and
+`stages` for customizable funnels, plus `invoices` and `invoice_items`). The schema lives in
+`backend/src/db/schema.sql` and is applied on startup; `backend/src/db/migrate.js`
+runs an idempotent migration that creates the default pipeline and moves any
+legacy deals onto it. Seed data is inserted on first run only. To re-seed an existing local
 database from scratch:
 
 ```bash
@@ -157,9 +204,17 @@ All endpoints are under `/api`. Every route except `/api/auth/login` requires an
 | GET/PUT/DELETE | `/companies/:id` | Detail / update / delete          |
 | GET/POST | `/deals`            | List / create                        |
 | PUT/DELETE | `/deals/:id`      | Update / delete                      |
-| PATCH  | `/deals/:id/stage`    | Move a deal to a new stage (Kanban)  |
+| PATCH  | `/deals/:id/stage`    | Move a deal to a column (Kanban)     |
+| GET/POST | `/pipelines`        | List funnels (+stages) / create      |
+| PUT/DELETE | `/pipelines/:id`  | Rename / delete a funnel             |
+| POST   | `/pipelines/:id/stages` | Add a column                       |
+| PUT    | `/pipelines/:id/stages/reorder` | Reorder columns            |
+| PUT/DELETE | `/stages/:id`     | Rename/retype / delete a column      |
 | GET/POST | `/tasks`            | List (status filter) / create        |
 | PUT/DELETE | `/tasks/:id`      | Update (incl. complete) / delete     |
+| GET/POST | `/invoices`         | List (search/status) / create        |
+| GET/PUT/DELETE | `/invoices/:id` | Detail / update / delete           |
+| PATCH  | `/invoices/:id/status` | Quick status change (sent/paid/…) |
 | POST/DELETE | `/notes` `/notes/:id` | Add / remove a note             |
 
 WebSocket: connect to `/ws`. Messages are JSON `{ type, payload }`, e.g.

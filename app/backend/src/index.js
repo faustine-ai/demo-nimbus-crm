@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { initSchema } from './db/index.js';
+import { migrate } from './db/migrate.js';
 import { seed } from './db/seed.js';
 import { initWebSocket } from './websocket/hub.js';
 import { requireAuth } from './middleware/auth.js';
@@ -14,7 +15,10 @@ import authRoutes from './routes/auth.js';
 import contactsRoutes from './routes/contacts.js';
 import companiesRoutes from './routes/companies.js';
 import dealsRoutes from './routes/deals.js';
+import pipelinesRoutes from './routes/pipelines.js';
+import stagesRoutes from './routes/stages.js';
 import tasksRoutes from './routes/tasks.js';
+import invoicesRoutes from './routes/invoices.js';
 import notesRoutes from './routes/notes.js';
 import activitiesRoutes from './routes/activities.js';
 import dashboardRoutes from './routes/dashboard.js';
@@ -22,8 +26,9 @@ import dashboardRoutes from './routes/dashboard.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 4000;
 
-// Initialize database and seed demo data on first run.
+// Initialize database, run migrations, and seed demo data on first run.
 initSchema();
+migrate();
 seed();
 
 const app = express();
@@ -39,7 +44,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/contacts', requireAuth, contactsRoutes);
 app.use('/api/companies', requireAuth, companiesRoutes);
 app.use('/api/deals', requireAuth, dealsRoutes);
+app.use('/api/pipelines', requireAuth, pipelinesRoutes);
+app.use('/api/stages', requireAuth, stagesRoutes);
 app.use('/api/tasks', requireAuth, tasksRoutes);
+app.use('/api/invoices', requireAuth, invoicesRoutes);
 app.use('/api/notes', requireAuth, notesRoutes);
 app.use('/api/activities', requireAuth, activitiesRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);

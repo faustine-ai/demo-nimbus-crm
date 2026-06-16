@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { DEAL_STAGES } from '@/lib/constants';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +11,12 @@ import { toast } from '@/components/ui/sonner';
 const NONE = '__none__';
 const empty = {
   name: '', company_id: NONE, contact_id: NONE, value: '',
-  stage: 'lead', close_date: '', notes: '',
+  stage_id: '', close_date: '', notes: '',
 };
 
-export function DealFormDialog({ open, onOpenChange, deal, defaultStage, onSaved }) {
+// `stages` is the column list for the current pipeline; `defaultStageId` is the
+// column a new deal should land in (e.g. the column whose "+" was clicked).
+export function DealFormDialog({ open, onOpenChange, deal, stages = [], defaultStageId, onSaved }) {
   const [form, setForm] = useState(empty);
   const [companies, setCompanies] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -27,20 +28,22 @@ export function DealFormDialog({ open, onOpenChange, deal, defaultStage, onSaved
     Promise.all([api.get('/companies'), api.get('/contacts')])
       .then(([co, ct]) => { setCompanies(co); setContacts(ct); })
       .catch(() => {});
+    const firstStageId = stages[0] ? String(stages[0].id) : '';
     if (deal) {
       setForm({
         name: deal.name || '',
         company_id: deal.company_id ? String(deal.company_id) : NONE,
         contact_id: deal.contact_id ? String(deal.contact_id) : NONE,
         value: deal.value != null ? String(deal.value) : '',
-        stage: deal.stage || 'lead',
+        stage_id: deal.stage_id ? String(deal.stage_id) : firstStageId,
         close_date: deal.close_date || '',
         notes: deal.notes || '',
       });
     } else {
-      setForm({ ...empty, stage: defaultStage || 'lead' });
+      setForm({ ...empty, stage_id: defaultStageId ? String(defaultStageId) : firstStageId });
     }
-  }, [open, deal, defaultStage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, deal, defaultStageId]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -56,7 +59,7 @@ export function DealFormDialog({ open, onOpenChange, deal, defaultStage, onSaved
       company_id: form.company_id === NONE ? null : Number(form.company_id),
       contact_id: form.contact_id === NONE ? null : Number(form.contact_id),
       value: Number(form.value) || 0,
-      stage: form.stage,
+      stage_id: form.stage_id ? Number(form.stage_id) : null,
       close_date: form.close_date || null,
       notes: form.notes,
     };
@@ -92,11 +95,11 @@ export function DealFormDialog({ open, onOpenChange, deal, defaultStage, onSaved
             </div>
             <div className="space-y-2">
               <Label>Stage</Label>
-              <Select value={form.stage} onValueChange={(v) => setForm((f) => ({ ...f, stage: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={form.stage_id} onValueChange={(v) => setForm((f) => ({ ...f, stage_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select stage" /></SelectTrigger>
                 <SelectContent>
-                  {DEAL_STAGES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  {stages.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

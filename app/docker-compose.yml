@@ -1,19 +1,53 @@
+# Default stack: development with live reload.
+#
+#   docker compose up
+#   open http://localhost:5173
+#
+# Source is mounted into the containers, so:
+#   - editing any frontend file hot-reloads the browser instantly (Vite HMR)
+#   - editing any backend file restarts the API (node --watch)
+#
+# For a production build (single container on :4000) use docker-compose.prod.yml:
+#   docker compose -f docker-compose.prod.yml up --build
+#
+# node_modules live in named volumes so host (macOS) binaries never clash with
+# the Linux container's (important for native modules like better-sqlite3).
+
 services:
-  crm:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: nimbus-crm
+  backend:
+    image: node:20-slim
+    working_dir: /app/backend
+    # nodemon with --legacy-watch (polling) reliably detects changes on mounted
+    # volumes, where node --watch / fs events do not on macOS & Windows.
+    command: sh -c "npm install && npm run dev"
+    environment:
+      PORT: "4000"
+      DB_PATH: "/app/backend/data/crm.db"
+      JWT_SECRET: "local-dev-secret"
+    volumes:
+      - ./backend:/app/backend
+      - backend-node-modules:/app/backend/node_modules
     ports:
       - "4000:4000"
+
+  frontend:
+    image: node:20-slim
+    working_dir: /app/frontend
+    command: sh -c "npm install && npm run dev -- --host"
     environment:
-      # Change this in any non-local deployment.
-      JWT_SECRET: "local-dev-secret"
-      DB_PATH: "/app/data/crm.db"
+      # Backend URL the dev server proxies to. Sourced from the .env file
+      # (BACKEND_URL); falls back to the backend service if unset.
+      BACKEND_URL: "${BACKEND_URL:-http://backend:4000}"
+      # Required for file-change detection on mounted volumes.
+      VITE_USE_POLLING: "true"
     volumes:
-      # Persist the SQLite database across container restarts.
-      - crm-data:/app/data
-    restart: unless-stopped
+      - ./frontend:/app/frontend
+      - frontend-node-modules:/app/frontend/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
 
 volumes:
-  crm-data:
+  backend-node-modules:
+  frontend-node-modules:

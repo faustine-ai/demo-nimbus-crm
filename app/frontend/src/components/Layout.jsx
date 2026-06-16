@@ -5,6 +5,7 @@ import {
   Users,
   Building2,
   Briefcase,
+  FileText,
   CheckSquare,
   Settings,
   Menu,
@@ -31,6 +32,7 @@ const NAV = [
   { to: '/contacts', label: 'Contacts', icon: Users },
   { to: '/companies', label: 'Companies', icon: Building2 },
   { to: '/deals', label: 'Deals', icon: Briefcase },
+  { to: '/invoices', label: 'Invoices', icon: FileText },
   { to: '/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -76,6 +78,8 @@ export function Layout({ children }) {
   const { connected } = useWebSocket();
   const location = useLocation();
   const current = NAV.find((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)));
+  // The Deals Kanban benefits from the full page width for its columns.
+  const fullWidth = location.pathname.startsWith('/deals');
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,7 +98,7 @@ export function Layout({ children }) {
         </div>
       )}
 
-      <div className="lg:pl-64">
+      <div className="flex min-h-screen flex-col lg:pl-64">
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-card/80 px-4 backdrop-blur sm:px-6">
           <div className="flex items-center gap-3">
@@ -133,7 +137,7 @@ export function Layout({ children }) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className={cn('mx-auto flex w-full flex-1 flex-col space-y-6 p-4 sm:p-6 lg:p-8', fullWidth ? 'max-w-none' : 'max-w-7xl')}>{children}</main>
       </div>
     </div>
   );

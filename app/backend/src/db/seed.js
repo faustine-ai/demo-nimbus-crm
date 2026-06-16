@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import db, { initSchema } from './index.js';
+import { createDefaultPipeline } from './migrate.js';
 
 /**
  * Seed the database with a default admin user and a useful set of demo data.
@@ -14,9 +15,15 @@ export function seed({ force = false } = {}) {
   }
 
   if (force) {
-    for (const t of ['activities', 'notes', 'tasks', 'deals', 'contacts', 'companies', 'users']) {
+    for (const t of ['invoice_items', 'invoices', 'activities', 'notes', 'tasks', 'deals', 'stages', 'pipelines', 'contacts', 'companies', 'users']) {
       db.prepare(`DELETE FROM ${t}`).run();
     }
+  }
+
+  // Ensure the default pipeline exists (normally created by migrate() at
+  // startup, but also needed for the standalone `seed --force` path).
+  if (db.prepare('SELECT COUNT(*) AS c FROM pipelines').get().c === 0) {
+    createDefaultPipeline();
   }
 
   const tx = db.transaction(() => {
@@ -57,6 +64,11 @@ export function seed({ force = false } = {}) {
     );
 
     // --- Deals ---
+    // Resolve stage ids from the default pipeline (created by migrate()).
+    const defaultPipeline = db.prepare('SELECT id FROM pipelines ORDER BY position, id LIMIT 1').get();
+    const stageRows = db.prepare('SELECT id, name FROM stages WHERE pipeline_id = ?').all(defaultPipeline.id);
+    const stageByName = new Map(stageRows.map((s) => [s.name.toLowerCase(), s]));
+
     const deals = [
       ['Acme annual renewal', companyIds[0], contactIds[0], 48000, 'negotiation', '2026-07-15'],
       ['Globex platform rollout', companyIds[1], contactIds[2], 120000, 'proposal', '2026-08-01'],
@@ -66,8 +78,10 @@ export function seed({ force = false } = {}) {
       ['Acme add-on seats', companyIds[0], contactIds[1], 9000, 'won', '2026-05-20'],
       ['Globex churn risk', companyIds[1], contactIds[3], 24000, 'lost', '2026-05-12'],
     ];
-    for (const d of deals) {
-      db.prepare('INSERT INTO deals (name, company_id, contact_id, value, stage, close_date) VALUES (?, ?, ?, ?, ?, ?)').run(...d);
+    for (const [name, companyId, contactId, value, stageKey, closeDate] of deals) {
+      const stage = stageByName.get(stageKey);
+      db.prepare('INSERT INTO deals (name, company_id, contact_id, value, stage, stage_id, close_date) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(name, companyId, contactId, value, stage.name, stage.id, closeDate);
     }
 
     // --- Tasks ---
@@ -98,6 +112,44 @@ export function seed({ force = false } = {}) {
     ];
     for (const a of activities) {
       db.prepare('INSERT INTO activities (type, message, actor_id) VALUES (?, ?, ?)').run(a[0], a[1], adminId);
+    }
+
+    // --- Invoices ---
+    const invoices = [
+      {
+        number: 'INV-0001', company_id: companyIds[0], contact_id: contactIds[0], status: 'paid',
+        issue_date: '2026-05-01', due_date: '2026-05-31', tax_rate: 8.5,
+        items: [
+          ['Annual platform license', 1, 36000],
+          ['Onboarding & training', 1, 6000],
+        ],
+      },
+      {
+        number: 'INV-0002', company_id: companyIds[1], contact_id: contactIds[2], status: 'sent',
+        issue_date: '2026-06-05', due_date: '2026-07-05', tax_rate: 0,
+        items: [
+          ['Platform rollout — phase 1', 1, 60000],
+          ['Custom integrations', 40, 250],
+        ],
+      },
+      {
+        number: 'INV-0003', company_id: companyIds[2], contact_id: contactIds[4], status: 'draft',
+        issue_date: '2026-06-12', due_date: '2026-07-12', tax_rate: 8.5,
+        items: [['Pilot program (3 months)', 3, 5000]],
+      },
+      {
+        number: 'INV-0004', company_id: companyIds[3], contact_id: contactIds[5], status: 'overdue',
+        issue_date: '2026-04-20', due_date: '2026-05-20', tax_rate: 8.5,
+        items: [['Expansion seats', 50, 120], ['Premium support', 1, 4000]],
+      },
+    ];
+    for (const inv of invoices) {
+      const id = db
+        .prepare('INSERT INTO invoices (number, company_id, contact_id, status, issue_date, due_date, tax_rate) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(inv.number, inv.company_id, inv.contact_id, inv.status, inv.issue_date, inv.due_date, inv.tax_rate).lastInsertRowid;
+      inv.items.forEach((it, i) =>
+        db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, position) VALUES (?, ?, ?, ?, ?)').run(id, it[0], it[1], it[2], i)
+      );
     }
   });
 

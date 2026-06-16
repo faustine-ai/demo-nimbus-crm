@@ -139,7 +139,7 @@ export default function ContactDetail() {
                         <div className="font-medium text-sm">{d.name}</div>
                         <div className="text-xs text-muted-foreground">{formatCurrency(d.value)}</div>
                       </div>
-                      <StageBadge stage={d.stage} />
+                      <StageBadge stage={d.stage_name || d.stage} type={d.stage_type} />
                     </div>
                   ))}
                 </div>
