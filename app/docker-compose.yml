@@ -1,0 +1,19 @@
+services:
+  crm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nimbus-crm
+    ports:
+      - "4000:4000"
+    environment:
+      # Change this in any non-local deployment.
+      JWT_SECRET: "local-dev-secret"
+      DB_PATH: "/app/data/crm.db"
+    volumes:
+      # Persist the SQLite database across container restarts.
+      - crm-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  crm-data:

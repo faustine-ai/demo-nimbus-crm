@@ -1,0 +1,13 @@
+# Dependencies
+**/node_modules
+
+# Build output
+**/dist
+app/backend/public
+
+# Runtime data (SQLite database lives in a Docker volume / local data dir)
+app/backend/data
+
+# Logs & misc
+*.log
+.DS_Store
