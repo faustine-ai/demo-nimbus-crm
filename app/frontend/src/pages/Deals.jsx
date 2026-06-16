@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, MoreHorizontal, MoreVertical, Pencil, Trash2, GripVertical } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useRealtime } from '@/hooks/useWebSocket';
 import { stageTypeMeta } from '@/lib/constants';
 import { formatCurrency, formatDate } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { cn, slugify } from '@/lib/utils';
 import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/Spinner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -53,10 +54,16 @@ function DealCard({ deal, onEdit, onDelete, onDragStart, onDragEnd }) {
 }
 
 export default function Deals() {
+  const { slug } = useParams();
+  const navigate = useNavigate();
   const [pipelines, setPipelines] = useState([]);
-  const [selectedId, setSelectedId] = useState(() => Number(localStorage.getItem(STORAGE_KEY)) || null);
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // The selected pipeline is derived from the URL slug (e.g. /deals/sales-pipeline).
+  const goToPipeline = useCallback((p, replace = false) => {
+    if (p) navigate(`/deals/${slugify(p.name)}`, { replace });
+  }, [navigate]);
 
   // Drag state: { type: 'card' | 'col', id }.
   const [drag, setDrag] = useState(null);
@@ -70,18 +77,14 @@ export default function Deals() {
   const [deletingStage, setDeletingStage] = useState(null);
   const [deletingPipeline, setDeletingPipeline] = useState(false);
 
-  const selectedPipeline = pipelines.find((p) => p.id === selectedId) || null;
+  const selectedPipeline = pipelines.find((p) => slugify(p.name) === slug) || null;
+  const selectedId = selectedPipeline?.id ?? null;
   const stages = selectedPipeline?.stages || [];
 
   const loadPipelines = useCallback(async () => {
     const data = await api.get('/pipelines');
     setPipelines(data);
-    setSelectedId((prev) => {
-      if (prev && data.some((p) => p.id === prev)) return prev;
-      const stored = Number(localStorage.getItem(STORAGE_KEY));
-      if (stored && data.some((p) => p.id === stored)) return stored;
-      return data[0]?.id ?? null;
-    });
+    return data;
   }, []);
 
   const loadDeals = useCallback(async () => {
@@ -95,10 +98,22 @@ export default function Deals() {
     loadPipelines().catch((e) => toast.error(e.message)).finally(() => setLoading(false));
   }, [loadPipelines]);
 
+  // Keep the URL pointing at a real pipeline: redirect when the slug is missing
+  // or no longer matches (e.g. after a rename or delete).
+  useEffect(() => {
+    if (!pipelines.length) return;
+    if (pipelines.some((p) => slugify(p.name) === slug)) return;
+    const storedId = Number(localStorage.getItem(STORAGE_KEY));
+    const target = pipelines.find((p) => p.id === storedId) || pipelines[0];
+    goToPipeline(target, true);
+  }, [pipelines, slug, goToPipeline]);
+
   useEffect(() => {
     if (selectedId) {
       localStorage.setItem(STORAGE_KEY, String(selectedId));
       loadDeals().catch(() => {});
+    } else {
+      setDeals([]);
     }
   }, [selectedId, loadDeals]);
 
@@ -180,15 +195,15 @@ export default function Deals() {
     try {
       await api.del(`/pipelines/${selectedId}`);
       toast.success('Pipeline deleted');
-      setSelectedId(null);
-      loadPipelines();
+      const data = await loadPipelines();
+      if (data && data[0]) goToPipeline(data[0], true);
     } catch (err) { toast.error(err.message); }
   }
 
   return (
     <div className="flex flex-1 flex-col gap-6 min-h-0">
       <PageHeader title="Deals" description="Customize columns, reorder them, and switch between funnels.">
-        <Select value={selectedId ? String(selectedId) : ''} onValueChange={(v) => setSelectedId(Number(v))}>
+        <Select value={selectedId ? String(selectedId) : ''} onValueChange={(v) => goToPipeline(pipelines.find((p) => p.id === Number(v)))}>
           <SelectTrigger className="w-44"><SelectValue placeholder="Pipeline" /></SelectTrigger>
           <SelectContent>
             {pipelines.map((p) => (
@@ -311,7 +326,7 @@ export default function Deals() {
         open={pipelineForm.open}
         onOpenChange={(v) => setPipelineForm((s) => ({ ...s, open: v }))}
         pipeline={pipelineForm.pipeline}
-        onSaved={(saved) => { loadPipelines(); if (saved?.id) setSelectedId(saved.id); }}
+        onSaved={(saved) => { loadPipelines(); goToPipeline(saved); }}
       />
       <StageFormDialog
         open={stageForm.open}
