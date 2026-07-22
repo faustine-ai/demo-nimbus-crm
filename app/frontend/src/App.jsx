@@ -1,21 +1,21 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { WebSocketProvider } from '@/hooks/useWebSocket';
-import { Layout } from '@/components/Layout';
-import { PageLoader } from '@/components/Spinner';
-import { Toaster } from '@/components/ui/sonner';
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { WebSocketProvider } from "@/hooks/useWebSocket";
+import { Layout } from "@/components/Layout";
+import { PageLoader } from "@/components/Spinner";
+import { Toaster } from "@/components/ui/sonner";
 
-import Login from '@/pages/Login';
-import Dashboard from '@/pages/Dashboard';
-import Contacts from '@/pages/Contacts';
-import ContactDetail from '@/pages/ContactDetail';
-import Companies from '@/pages/Companies';
-import CompanyDetail from '@/pages/CompanyDetail';
-import Deals from '@/pages/Deals';
-import Invoices from '@/pages/Invoices';
-import InvoiceDetail from '@/pages/InvoiceDetail';
-import Tasks from '@/pages/Tasks';
-import Settings from '@/pages/Settings';
+import Login from "@/pages/Login";
+import Dashboard from "@/pages/Dashboard";
+import Contacts from "@/pages/Contacts";
+import ContactDetail from "@/pages/ContactDetail";
+import Companies from "@/pages/Companies";
+import CompanyDetail from "@/pages/CompanyDetail";
+import Deals from "@/pages/Deals";
+import Invoices from "@/pages/Invoices";
+import InvoiceDetail from "@/pages/InvoiceDetail";
+import Tasks from "@/pages/Tasks";
+import Settings from "@/pages/Settings";
 
 export default function App() {
   const { user, loading } = useAuth();
