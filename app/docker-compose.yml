@@ -24,6 +24,9 @@ services:
       PORT: "4000"
       DB_PATH: "/app/backend/data/crm.db"
       JWT_SECRET: "local-dev-secret"
+      # Seed passwords for the demo users (only used on first seed).
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-changeme}"
+      REP_PASSWORD: "${REP_PASSWORD:-changeme}"
     volumes:
       - ./backend:/app/backend
       - backend-node-modules:/app/backend/node_modules
