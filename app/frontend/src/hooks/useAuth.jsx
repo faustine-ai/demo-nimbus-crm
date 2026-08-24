@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import Faustine from '@faustine-ai/web-agent';
 import { api, getToken, setToken } from '@/lib/api';
 
 const AuthContext = createContext(null);
@@ -34,6 +35,17 @@ export function AuthProvider({ children }) {
       window.removeEventListener('crm:unauthorized', onUnauthorized);
     };
   }, []);
+
+  // Only start the Faustine web agent once the user is authenticated.
+  const faustineStarted = useRef(false);
+  useEffect(() => {
+    if (user && !faustineStarted.current) {
+      faustineStarted.current = true;
+      Faustine.init({
+        agentId: 'ade2e087-882c-42e0-a0a5-ae9987495b4c',
+      });
+    }
+  }, [user]);
 
   const login = useCallback(async (email, password) => {
     const { token, user } = await api.post('/auth/login', { email, password });
