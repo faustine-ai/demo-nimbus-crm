@@ -11,8 +11,8 @@ import { toast } from '@/components/ui/sonner';
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@crm.test');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e) {
@@ -55,10 +55,6 @@ export default function Login() {
                 {submitting ? <Spinner className="h-4 w-4 text-primary-foreground" /> : 'Sign in'}
               </Button>
             </form>
-
-            <div className="mt-5 rounded-lg bg-muted p-3 text-center text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Demo login</span> · admin@crm.test / admin123
-            </div>
           </CardContent>
         </Card>
       </div>

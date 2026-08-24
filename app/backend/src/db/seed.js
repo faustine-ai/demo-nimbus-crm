@@ -28,8 +28,10 @@ export function seed({ force = false } = {}) {
 
   const tx = db.transaction(() => {
     // --- Users ---
-    const adminHash = bcrypt.hashSync('admin123', 10);
-    const repHash = bcrypt.hashSync('sales123', 10);
+    // The admin password comes from the environment so deployed instances can
+    // set it as a secret instead of shipping it in source.
+    const adminHash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'changeme', 10);
+    const repHash = bcrypt.hashSync(process.env.REP_PASSWORD || 'changeme', 10);
     const adminId = db
       .prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'admin')")
       .run('Admin User', 'admin@crm.test', adminHash).lastInsertRowid;
